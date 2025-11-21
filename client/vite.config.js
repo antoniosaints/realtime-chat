@@ -15,12 +15,12 @@ export default defineConfig({
         theme_color: "#ffffff",
         icons: [
           {
-            src: "pwa-192x192.png",
+            src: "/imgs/192.png",
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: "pwa-512x512.png",
+            src: "/imgs/512.png",
             sizes: "512x512",
             type: "image/png",
           },
@@ -31,6 +31,6 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    allowedHosts: ["21b55dc27185.ngrok-free.app"],
+    allowedHosts: ["21b55dc27185.ngrok-free.app", "localhost", "127.0.0.1"],
   },
 });

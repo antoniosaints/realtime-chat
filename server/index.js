@@ -184,10 +184,8 @@ io.on("connection", (socket) => {
     };
 
     try {
-      // Only save text messages to DB (as requested)
-      if (msgRecord.type !== "audio") {
-        await dbOps.addMessage(msgRecord);
-      }
+      // Save all messages to DB (text, audio, image)
+      await dbOps.addMessage(msgRecord);
 
       if (sender === "client") {
         // Client sent message.
