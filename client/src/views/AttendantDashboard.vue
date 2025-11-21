@@ -529,9 +529,10 @@ socket.on('closed_chats_list', (chats) => {
                 <div v-else-if="msg.replyTo.type === 'image'" class="italic">Imagem</div>
               </div>
               <p v-if="msg.type === 'text'" class="leading-relaxed">{{ msg.text }}</p>
-              <audio v-else-if="msg.type === 'audio'" :src="msg.text" controls class="max-w-full"></audio>
-              <img v-else-if="msg.type === 'image'" :src="msg.text" class="max-w-64 rounded-lg cursor-pointer"
-                @click.stop="window.open(msg.text, '_blank')" />
+              <audio @click="setReplyTo(msg)" v-else-if="msg.type === 'audio'" :src="msg.text" controls
+                class="max-w-full"></audio>
+              <img @click="setReplyTo(msg)" v-else-if="msg.type === 'image'" :src="msg.text"
+                class="max-w-64 rounded-lg cursor-pointer" @click.stop="window.open(msg.text, '_blank')" />
               <span
                 :class="['text-[10px] block mt-1 text-right', msg.sender === 'attendant' ? 'text-primary-light' : 'text-slate-400']">
                 {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}

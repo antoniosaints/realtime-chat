@@ -330,7 +330,8 @@ const handleImageUpload = async (event) => {
       </header>
 
       <!-- Messages -->
-      <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+      <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50"
+        :class="[replyingTo ? 'max-h-[calc(100vh-14rem)]' : 'max-h-[calc(100vh-9.5rem)]']">
         <div v-for="(msg, index) in messages" :key="index"
           :class="['flex', msg.sender === 'client' ? 'justify-end' : 'justify-start']">
           <div @click="setReplyTo(msg)" :class="[
@@ -350,10 +351,11 @@ const handleImageUpload = async (event) => {
               <div v-else-if="msg.replyTo.type === 'image'" class="italic">📷 Imagem</div>
             </div>
 
-            <p v-if="msg.type === 'text'">{{ msg.text }}</p>
-            <audio v-else-if="msg.type === 'audio'" :src="msg.text" controls class="max-w-full"></audio>
-            <img v-else-if="msg.type === 'image'" :src="msg.text" class="max-w-64 rounded-lg cursor-pointer"
-              @click.stop="window.open(msg.text, '_blank')" />
+            <p class="truncate" v-if="msg.type === 'text'">{{ msg.text }}</p>
+            <audio @click="setReplyTo(msg)" v-else-if="msg.type === 'audio'" :src="msg.text" controls
+              class="max-w-full"></audio>
+            <img @click="setReplyTo(msg)" v-else-if="msg.type === 'image'" :src="msg.text"
+              class="max-w-64 rounded-lg cursor-pointer" @click.stop="window.open(msg.text, '_blank')" />
             <span
               :class="['text-[10px] block mt-1', msg.sender === 'client' ? 'text-primary-light' : 'text-slate-400']">
               {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
