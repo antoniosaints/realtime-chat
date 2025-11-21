@@ -620,8 +620,10 @@ socket.on('closed_chats_list', (chats) => {
                       ? 'bg-slate-100 text-slate-800 rounded-br-none'
                       : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'
                   ]">
-                    <p v-if="msg.type !== 'audio'" class="leading-relaxed">{{ msg.text }}</p>
-                    <audio v-else :src="msg.text" controls class="max-w-full"></audio>
+                    <audio v-if="msg.type === 'audio'" :src="msg.text" controls class="max-w-full"></audio>
+                    <img v-else-if="msg.type === 'image'" :src="msg.text" class="max-w-64 rounded-lg cursor-pointer"
+                      @click="window.open(msg.text, '_blank')" />
+                    <p v-else class="leading-relaxed">{{ msg.text }}</p>
                     <span class="text-[10px] block mt-1 text-right text-slate-400">
                       {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                     </span>
