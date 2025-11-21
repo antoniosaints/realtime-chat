@@ -29,6 +29,11 @@ db.serialize(() => {
   db.run("ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'", (err) => {
     // Ignore error if column already exists
   });
+
+  // Migration: Add 'reply_to' column for message replies
+  db.run("ALTER TABLE messages ADD COLUMN reply_to INTEGER", (err) => {
+    // Ignore error if column already exists
+  });
 });
 
 const dbOps = {
@@ -119,7 +124,7 @@ const dbOps = {
   addMessage: (msg) => {
     return new Promise((resolve, reject) => {
       const stmt = db.prepare(
-        "INSERT INTO messages (chat_id, sender, text, type, timestamp) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO messages (chat_id, sender, text, type, timestamp, reply_to) VALUES (?, ?, ?, ?, ?, ?)"
       );
       stmt.run(
         msg.chatId,
@@ -127,6 +132,7 @@ const dbOps = {
         msg.text,
         msg.type || "text",
         msg.timestamp,
+        msg.replyTo || null,
         function (err) {
           if (err) reject(err);
           else resolve(this.lastID);

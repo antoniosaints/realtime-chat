@@ -9,6 +9,7 @@ const messages = ref({}); // Map of chatId -> messages array
 const currentMessage = ref('');
 const messagesContainer = ref(null);
 const isRecording = ref(false);
+const replyingTo = ref(null);
 let mediaRecorder = null;
 let audioChunks = [];
 
@@ -139,7 +140,13 @@ const sendMessage = () => {
       chatId: currentChatId.value,
       text: currentMessage.value,
       sender: 'attendant',
-      type: 'text'
+      type: 'text',
+      replyTo: replyingTo.value ? {
+        id: replyingTo.value.id,
+        text: replyingTo.value.text,
+        type: replyingTo.value.type,
+        sender: replyingTo.value.sender
+      } : null
     };
     socket.emit('send_message', msg);
 
@@ -151,11 +158,26 @@ const sendMessage = () => {
       sender: 'attendant',
       text: currentMessage.value,
       type: 'text',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      replyTo: replyingTo.value ? {
+        id: replyingTo.value.id,
+        text: replyingTo.value.text,
+        type: replyingTo.value.type,
+        sender: replyingTo.value.sender
+      } : null
     });
 
     currentMessage.value = '';
+    replyingTo.value = null;
   }
+};
+
+const setReplyTo = (msg) => {
+  replyingTo.value = msg;
+};
+
+const cancelReply = () => {
+  replyingTo.value = null;
 };
 
 const startRecording = async () => {
@@ -489,16 +511,27 @@ socket.on('closed_chats_list', (chats) => {
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
           <div v-for="(msg, index) in currentMessages" :key="index"
             :class="['flex', msg.sender === 'attendant' ? 'justify-end' : 'justify-start']">
-            <div :class="[
-              'max-w-[70%] px-5 py-3 rounded-2xl shadow-sm',
+            <div @click="setReplyTo(msg)" :class="[
+              'max-w-[70%] px-5 py-3 rounded-2xl shadow-sm cursor-pointer hover:opacity-80 transition-opacity',
               msg.sender === 'attendant'
                 ? 'bg-primary text-white rounded-br-none'
                 : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'
             ]">
+              <!-- Quoted Message -->
+              <div v-if="msg.replyTo" :class="[
+                'mb-2 p-2 rounded-lg border-l-2 text-xs opacity-70',
+                msg.sender === 'attendant' ? 'bg-primary-dark/20 border-white' : 'bg-slate-100 border-slate-400'
+              ]">
+                <div class="font-semibold">{{ msg.replyTo.sender === 'client' ? (currentChat?.name || 'Cliente') :
+                  'Atendente' }}</div>
+                <div v-if="msg.replyTo.type === 'text'" class="truncate">{{ msg.replyTo.text }}</div>
+                <div v-else-if="msg.replyTo.type === 'audio'" class="italic">Áudio</div>
+                <div v-else-if="msg.replyTo.type === 'image'" class="italic">Imagem</div>
+              </div>
               <p v-if="msg.type === 'text'" class="leading-relaxed">{{ msg.text }}</p>
               <audio v-else-if="msg.type === 'audio'" :src="msg.text" controls class="max-w-full"></audio>
               <img v-else-if="msg.type === 'image'" :src="msg.text" class="max-w-64 rounded-lg cursor-pointer"
-                @click="window.open(msg.text, '_blank')" />
+                @click.stop="window.open(msg.text, '_blank')" />
               <span
                 :class="['text-[10px] block mt-1 text-right', msg.sender === 'attendant' ? 'text-primary-light' : 'text-slate-400']">
                 {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
@@ -509,6 +542,24 @@ socket.on('closed_chats_list', (chats) => {
 
         <!-- Input Area -->
         <div class="bg-white border-t border-slate-200 p-6">
+          <!-- Reply Indicator -->
+          <div v-if="replyingTo" class="mb-3 bg-slate-100 rounded-lg p-3 flex items-start justify-between">
+            <div class="flex-1">
+              <div class="text-xs font-semibold text-slate-600 mb-1">Respondendo a {{ replyingTo.sender === 'client' ?
+                (currentChat?.name || 'Cliente') : 'Atendente' }}</div>
+              <div v-if="replyingTo.type === 'text'" class="text-sm text-slate-700 truncate">{{ replyingTo.text }}</div>
+              <div v-else-if="replyingTo.type === 'audio'" class="text-sm text-slate-700 italic">Áudio</div>
+              <div v-else-if="replyingTo.type === 'image'" class="text-sm text-slate-700 italic">Imagem</div>
+            </div>
+            <button @click="cancelReply" class="text-slate-400 hover:text-slate-600 ml-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
+
           <div class="flex gap-4">
 
             <!-- Image Upload -->

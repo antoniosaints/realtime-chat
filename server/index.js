@@ -173,7 +173,7 @@ io.on("connection", (socket) => {
 
   // Message handling
   socket.on("send_message", async (data) => {
-    const { chatId, text, sender, type } = data;
+    const { chatId, text, sender, type, replyTo } = data;
 
     const msgRecord = {
       chatId: chatId,
@@ -181,6 +181,7 @@ io.on("connection", (socket) => {
       text: text,
       type: type || "text",
       timestamp: Date.now(),
+      replyTo: replyTo || null,
     };
 
     try {

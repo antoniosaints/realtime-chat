@@ -14,6 +14,7 @@ const chatId = ref(null);
 const attendantName = ref('');
 const messagesContainer = ref(null);
 const isRecording = ref(false);
+const replyingTo = ref(null);
 let mediaRecorder = null;
 let audioChunks = [];
 
@@ -92,11 +93,26 @@ const sendMessage = () => {
       chatId: chatId.value,
       text: currentMessage.value,
       sender: 'client',
-      type: 'text'
+      type: 'text',
+      replyTo: replyingTo.value ? {
+        id: replyingTo.value.id,
+        text: replyingTo.value.text,
+        type: replyingTo.value.type,
+        sender: replyingTo.value.sender
+      } : null
     };
     socket.emit('send_message', msg);
     currentMessage.value = '';
+    replyingTo.value = null;
   }
+};
+
+const setReplyTo = (msg) => {
+  replyingTo.value = msg;
+};
+
+const cancelReply = () => {
+  replyingTo.value = null;
 };
 
 const startRecording = async () => {
@@ -317,16 +333,27 @@ const handleImageUpload = async (event) => {
       <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
         <div v-for="(msg, index) in messages" :key="index"
           :class="['flex', msg.sender === 'client' ? 'justify-end' : 'justify-start']">
-          <div :class="[
-            'max-w-[80%] px-4 py-2 rounded-2xl shadow-sm',
+          <div @click="setReplyTo(msg)" :class="[
+            'max-w-[80%] px-4 py-2 rounded-2xl shadow-sm cursor-pointer hover:opacity-80 transition-opacity',
             msg.sender === 'client'
               ? 'bg-primary text-white rounded-br-none'
               : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'
           ]">
+            <!-- Quoted Message -->
+            <div v-if="msg.replyTo" :class="[
+              'mb-2 p-2 rounded-lg border-l-2 text-xs opacity-70',
+              msg.sender === 'client' ? 'bg-primary-dark/20 border-white' : 'bg-slate-100 border-slate-400'
+            ]">
+              <div class="font-semibold">{{ msg.replyTo.sender === 'client' ? clientName : attendantName }}</div>
+              <div v-if="msg.replyTo.type === 'text'" class="truncate">{{ msg.replyTo.text }}</div>
+              <div v-else-if="msg.replyTo.type === 'audio'" class="italic">🎤 Áudio</div>
+              <div v-else-if="msg.replyTo.type === 'image'" class="italic">📷 Imagem</div>
+            </div>
+
             <p v-if="msg.type === 'text'">{{ msg.text }}</p>
             <audio v-else-if="msg.type === 'audio'" :src="msg.text" controls class="max-w-full"></audio>
             <img v-else-if="msg.type === 'image'" :src="msg.text" class="max-w-64 rounded-lg cursor-pointer"
-              @click="window.open(msg.text, '_blank')" />
+              @click.stop="window.open(msg.text, '_blank')" />
             <span
               :class="['text-[10px] block mt-1', msg.sender === 'client' ? 'text-primary-light' : 'text-slate-400']">
               {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
@@ -337,6 +364,26 @@ const handleImageUpload = async (event) => {
 
       <!-- Input Area -->
       <div class="bg-white border-t border-slate-100 p-4">
+        <!-- Reply Indicator -->
+        <div v-if="replyingTo" class="mb-2 bg-slate-100 rounded-lg p-3 flex items-start justify-between">
+          <div class="flex-1">
+            <div class="text-xs font-semibold text-slate-600 mb-1">Respondendo a {{ replyingTo.sender === 'client' ?
+              clientName : attendantName }}</div>
+            <div v-if="replyingTo.type === 'text'" class="text-sm text-slate-700 truncate">
+              {{ replyingTo.text }}
+            </div>
+            <div v-else-if="replyingTo.type === 'audio'" class="text-sm text-slate-700 italic">🎤 Áudio</div>
+            <div v-else-if="replyingTo.type === 'image'" class="text-sm text-slate-700 italic">📷 Imagem</div>
+          </div>
+          <button @click="cancelReply" class="text-slate-400 hover:text-slate-600 ml-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clip-rule="evenodd" />
+            </svg>
+          </button>
+        </div>
+
         <div
           class="flex items-center space-x-2 bg-slate-50 rounded-full px-4 py-2 border border-slate-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all">
 
