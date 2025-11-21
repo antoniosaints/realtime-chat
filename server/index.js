@@ -159,6 +159,24 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("get_closed_chats", async () => {
+    try {
+      const closedChats = await dbOps.getClosedChats();
+      socket.emit("closed_chats_list", closedChats);
+    } catch (err) {
+      console.error("Error fetching closed chats:", err);
+    }
+  });
+
+  socket.on("fetch_history_messages", async (chatId) => {
+    try {
+      const messages = await dbOps.getMessages(chatId);
+      socket.emit("history_messages_received", { chatId, messages });
+    } catch (err) {
+      console.error("Error fetching history messages:", err);
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
     // Optional: Mark client as disconnected in DB or remove from queue if waiting

@@ -81,6 +81,18 @@ const dbOps = {
     });
   },
 
+  getClosedChats: () => {
+    return new Promise((resolve, reject) => {
+      db.all(
+        "SELECT * FROM clients WHERE status = 'closed' ORDER BY timestamp DESC",
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+  },
+
   updateClientStatus: (id, status, attendantId = null) => {
     return new Promise((resolve, reject) => {
       let query = "UPDATE clients SET status = ? WHERE id = ?";

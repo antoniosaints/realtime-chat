@@ -157,6 +157,39 @@ const endChat = () => {
     }
   }
 };
+
+// History Logic
+const showHistory = ref(false);
+const closedChats = ref([]);
+const selectedHistoryChat = ref(null);
+const historyMessages = ref([]);
+
+const openHistory = () => {
+  showHistory.value = true;
+  socket.emit('get_closed_chats');
+};
+
+const closeHistory = () => {
+  showHistory.value = false;
+  selectedHistoryChat.value = null;
+  historyMessages.value = [];
+};
+
+const selectHistoryChat = (chat) => {
+  selectedHistoryChat.value = chat;
+  socket.emit('fetch_history_messages', chat.id);
+};
+
+// We need to listen for the history messages
+socket.on('history_messages_received', (data) => {
+  if (selectedHistoryChat.value && selectedHistoryChat.value.id === data.chatId) {
+    historyMessages.value = data.messages;
+  }
+});
+
+socket.on('closed_chats_list', (chats) => {
+  closedChats.value = chats;
+});
 </script>
 
 <template>
@@ -238,16 +271,26 @@ const endChat = () => {
 
       <!-- User Profile -->
       <div class="p-4 border-t border-slate-100 bg-slate-50">
-        <div class="flex items-center gap-3">
-          <div class="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
-            A
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
+              A
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-slate-800">Atendente</p>
+              <p class="text-xs text-green-600 flex items-center gap-1">
+                <span class="h-1.5 w-1.5 bg-green-600 rounded-full"></span> Online
+              </p>
+            </div>
           </div>
-          <div>
-            <p class="text-sm font-semibold text-slate-800">Atendente</p>
-            <p class="text-xs text-green-600 flex items-center gap-1">
-              <span class="h-1.5 w-1.5 bg-green-600 rounded-full"></span> Online
-            </p>
-          </div>
+          <button @click="openHistory" title="Histórico"
+            class="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
         </div>
       </div>
     </aside>
@@ -318,6 +361,78 @@ const endChat = () => {
         <p class="max-w-sm text-center">Selecione um cliente da fila ou um atendimento ativo para continuar.</p>
       </div>
     </main>
+
+    <!-- History Modal -->
+    <div v-if="showHistory"
+      class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex overflow-hidden flex-col">
+        <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Histórico de Atendimentos
+          </h2>
+          <button @click="closeHistory"
+            class="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="flex-1 flex overflow-hidden">
+          <!-- List -->
+          <div class="w-1/3 border-r border-slate-200 overflow-y-auto bg-slate-50">
+            <div v-if="closedChats.length === 0" class="p-8 text-center text-slate-400">
+              Nenhum histórico encontrado.
+            </div>
+            <div v-for="chat in closedChats" :key="chat.id" @click="selectHistoryChat(chat)"
+              :class="['p-4 border-b border-slate-100 cursor-pointer hover:bg-white transition-colors', selectedHistoryChat?.id === chat.id ? 'bg-white border-l-4 border-l-primary' : '']">
+              <h3 class="font-semibold text-slate-800">{{ chat.name }}</h3>
+              <p class="text-xs text-slate-500 mt-1">
+                {{ new Date(chat.timestamp).toLocaleDateString() }}
+                {{ new Date(chat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+              </p>
+              <span
+                class="inline-block mt-2 text-[10px] px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full">Finalizado</span>
+            </div>
+          </div>
+
+          <!-- Details -->
+          <div class="flex-1 flex flex-col bg-white">
+            <div v-if="selectedHistoryChat" class="flex-1 flex flex-col h-full">
+              <div class="p-4 border-b border-slate-100 bg-slate-50/30">
+                <h3 class="font-bold text-slate-800">{{ selectedHistoryChat.name }}</h3>
+                <p class="text-xs text-slate-500">Visualizando histórico</p>
+              </div>
+              <div class="flex-1 overflow-y-auto p-6 space-y-4">
+                <div v-for="(msg, index) in historyMessages" :key="index"
+                  :class="['flex', msg.sender === 'attendant' ? 'justify-end' : 'justify-start']">
+                  <div :class="[
+                    'max-w-[70%] px-5 py-3 rounded-2xl shadow-sm',
+                    msg.sender === 'attendant'
+                      ? 'bg-slate-100 text-slate-800 rounded-br-none'
+                      : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'
+                  ]">
+                    <p class="leading-relaxed">{{ msg.text }}</p>
+                    <span class="text-[10px] block mt-1 text-right text-slate-400">
+                      {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="flex-1 flex items-center justify-center text-slate-400">
+              <p>Selecione um atendimento para ver as mensagens</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
