@@ -180,6 +180,23 @@ const cancelReply = () => {
   replyingTo.value = null;
 };
 
+const handleEnterKey = (event) => {
+  if (event.ctrlKey) {
+    // Ctrl+Enter: add new line (default behavior)
+    return;
+  } else {
+    // Enter without Ctrl: send message
+    event.preventDefault();
+    sendMessage();
+  }
+};
+
+const autoResize = (event) => {
+  const textarea = event.target;
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+};
+
 const startRecording = async () => {
   if (!currentChatId.value) return;
 
@@ -528,7 +545,7 @@ socket.on('closed_chats_list', (chats) => {
                 <div v-else-if="msg.replyTo.type === 'audio'" class="italic">Áudio</div>
                 <div v-else-if="msg.replyTo.type === 'image'" class="italic">Imagem</div>
               </div>
-              <p v-if="msg.type === 'text'" class="leading-relaxed">{{ msg.text }}</p>
+              <p v-if="msg.type === 'text'" class="leading-relaxed break-words whitespace-pre-wrap">{{ msg.text }}</p>
               <audio @click="setReplyTo(msg)" v-else-if="msg.type === 'audio'" :src="msg.text" controls
                 class="max-w-full"></audio>
               <img @click="setReplyTo(msg)" v-else-if="msg.type === 'image'" :src="msg.text"
@@ -574,8 +591,9 @@ socket.on('closed_chats_list', (chats) => {
               </svg>
             </button>
 
-            <input v-model="currentMessage" @keyup.enter="sendMessage" placeholder="Escreva sua mensagem..."
-              class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" />
+            <textarea v-model="currentMessage" @keyup.enter="handleEnterKey" placeholder="Escreva sua mensagem..."
+              class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none max-h-32 overflow-y-auto"
+              rows="1" @input="autoResize"></textarea>
 
             <!-- Mic Button -->
             <button @click="toggleRecording"

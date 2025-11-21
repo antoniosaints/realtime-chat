@@ -115,6 +115,23 @@ const cancelReply = () => {
   replyingTo.value = null;
 };
 
+const handleEnterKey = (event) => {
+  if (event.ctrlKey) {
+    // Ctrl+Enter: add new line (default behavior)
+    return;
+  } else {
+    // Enter without Ctrl: send message
+    event.preventDefault();
+    sendMessage();
+  }
+};
+
+const autoResize = (event) => {
+  const textarea = event.target;
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+};
+
 const startRecording = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -351,7 +368,7 @@ const handleImageUpload = async (event) => {
               <div v-else-if="msg.replyTo.type === 'image'" class="italic">📷 Imagem</div>
             </div>
 
-            <p class="truncate" v-if="msg.type === 'text'">{{ msg.text }}</p>
+            <p v-if="msg.type === 'text'" class="break-words whitespace-pre-wrap">{{ msg.text }}</p>
             <audio @click="setReplyTo(msg)" v-else-if="msg.type === 'audio'" :src="msg.text" controls
               class="max-w-full"></audio>
             <img @click="setReplyTo(msg)" v-else-if="msg.type === 'image'" :src="msg.text"
@@ -400,8 +417,9 @@ const handleImageUpload = async (event) => {
             </svg>
           </button>
 
-          <input v-model="currentMessage" @keyup.enter="sendMessage" placeholder="Type a message..."
-            class="flex-1 bg-transparent border-none focus:ring-0 text-slate-900 placeholder-slate-400" />
+          <textarea v-model="currentMessage" @keyup.enter="handleEnterKey" placeholder="Type a message..."
+            class="flex-1 bg-transparent border-none outline-none text-slate-900 placeholder-slate-400 resize-none max-h-32 overflow-y-auto"
+            rows="1" @input="autoResize"></textarea>
 
           <!-- Mic Button -->
           <button @click="toggleRecording"
