@@ -15,6 +15,50 @@ const io = new Server(server, {
   },
 });
 
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+// Ensure audios directory exists
+const audioDir = path.join(__dirname, "audios");
+if (!fs.existsSync(audioDir)) {
+  fs.mkdirSync(audioDir);
+}
+
+// Configure Multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, audioDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    // We assume the blob is webm/opus, but we can try to infer or just use .webm
+    cb(null, uniqueSuffix + ".webm");
+  },
+});
+
+const upload = multer({ storage: storage });
+
+// Serve static files
+app.use("/audios", express.static(audioDir));
+
+// Upload endpoint
+app.post("/api/upload-audio", upload.single("audio"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).send("No file uploaded.");
+  }
+  // Return the URL to access the file
+  // Assuming server runs on same host/port, relative path works for frontend if proxied or same origin
+  // But here frontend is 5173, backend 3000. We need full URL or proxy.
+  // For now, let's return relative path and frontend handles base URL or we return full URL.
+  // Since we are using cors *, we probably need full URL or frontend needs to know backend URL.
+  // Let's return relative path and assume frontend knows backend URL (socket.js has it).
+  // Actually, better to return full URL if possible, or just path.
+  // Let's stick to path `/audios/filename` and frontend prepends backend URL.
+  const fileUrl = `/audios/${req.file.filename}`;
+  res.json({ url: fileUrl });
+});
+
 // Run cleanup on startup
 dbOps.cleanupOldData();
 // Run cleanup every hour
@@ -105,17 +149,22 @@ io.on("connection", (socket) => {
 
   // Message handling
   socket.on("send_message", async (data) => {
-    const { chatId, text, sender } = data;
+    const { chatId, text, sender, type } = data;
 
     const msgRecord = {
       chatId: chatId,
       sender: sender,
       text: text,
+      type: type || "text",
       timestamp: Date.now(),
     };
 
     try {
-      await dbOps.addMessage(msgRecord);
+      // Only save text messages to DB (as requested)
+      if (msgRecord.type !== "audio") {
+        await dbOps.addMessage(msgRecord);
+      }
+
       if (sender === "client") {
         // Client sent message.
         // We need to find who is the attendant for this client.
@@ -133,7 +182,7 @@ io.on("connection", (socket) => {
         io.to(chatId).emit("receive_message", msgRecord);
       }
     } catch (err) {
-      console.error("Error saving message:", err);
+      console.error("Error saving/sending message:", err);
     }
   });
 

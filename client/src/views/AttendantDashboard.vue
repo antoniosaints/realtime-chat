@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
-import { socket } from '../services/socket';
+import { socket, SERVER_URL } from '../services/socket';
 
 const queue = ref([]);
 const activeChats = ref([]); // List of active chat sessions
@@ -8,6 +8,9 @@ const currentChatId = ref(null); // ID of the currently selected chat
 const messages = ref({}); // Map of chatId -> messages array
 const currentMessage = ref('');
 const messagesContainer = ref(null);
+const isRecording = ref(false);
+let mediaRecorder = null;
+let audioChunks = [];
 
 // Computed property for the currently selected chat object
 const currentChat = computed(() => {
@@ -135,7 +138,8 @@ const sendMessage = () => {
     const msg = {
       chatId: currentChatId.value,
       text: currentMessage.value,
-      sender: 'attendant'
+      sender: 'attendant',
+      type: 'text'
     };
     socket.emit('send_message', msg);
 
@@ -146,10 +150,111 @@ const sendMessage = () => {
     messages.value[currentChatId.value].push({
       sender: 'attendant',
       text: currentMessage.value,
+      type: 'text',
       timestamp: Date.now()
     });
 
     currentMessage.value = '';
+  }
+};
+
+const startRecording = async () => {
+  if (!currentChatId.value) return;
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    let mimeType = 'audio/webm';
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      mimeType = 'audio/webm;codecs=opus';
+    } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+      mimeType = 'audio/ogg;codecs=opus';
+    }
+
+    const options = { mimeType };
+    mediaRecorder = new MediaRecorder(stream, options);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: mimeType });
+
+      if (audioBlob.size === 0) {
+        console.error("Recorded audio is empty");
+        return;
+      }
+
+      console.log("Audio recorded. Size:", audioBlob.size, "Type:", mimeType);
+
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+
+      try {
+        const baseUrl = SERVER_URL || '';
+        const response = await fetch(`${baseUrl}/api/upload-audio`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const audioUrl = `${baseUrl}${data.url}`;
+
+        const msg = {
+          chatId: currentChatId.value,
+          text: audioUrl,
+          sender: 'attendant',
+          type: 'audio'
+        };
+        socket.emit('send_message', msg);
+
+        // Optimistic update
+        if (!messages.value[currentChatId.value]) {
+          messages.value[currentChatId.value] = [];
+        }
+        messages.value[currentChatId.value].push({
+          sender: 'attendant',
+          text: audioUrl,
+          type: 'audio',
+          timestamp: Date.now()
+        });
+      } catch (err) {
+        console.error("Error uploading audio:", err);
+        alert("Erro ao enviar áudio.");
+      }
+
+      stream.getTracks().forEach(track => track.stop());
+    };
+
+    mediaRecorder.start(200);
+    isRecording.value = true;
+  } catch (err) {
+    console.error("Error accessing microphone:", err);
+    alert("Erro ao acessar microfone. Verifique as permissões.");
+  }
+};
+
+const stopRecording = () => {
+  if (mediaRecorder && isRecording.value && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.requestData();
+    mediaRecorder.stop();
+    isRecording.value = false;
+  }
+};
+
+const toggleRecording = () => {
+  if (isRecording.value) {
+    stopRecording();
+  } else {
+    startRecording();
   }
 };
 
@@ -329,7 +434,8 @@ socket.on('closed_chats_list', (chats) => {
                 ? 'bg-primary text-white rounded-br-none'
                 : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'
             ]">
-              <p class="leading-relaxed">{{ msg.text }}</p>
+              <p v-if="msg.type !== 'audio'" class="leading-relaxed">{{ msg.text }}</p>
+              <audio v-else :src="msg.text" controls class="max-w-full"></audio>
               <span
                 :class="['text-[10px] block mt-1 text-right', msg.sender === 'attendant' ? 'text-primary-light' : 'text-slate-400']">
                 {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
@@ -343,6 +449,24 @@ socket.on('closed_chats_list', (chats) => {
           <div class="flex gap-4">
             <input v-model="currentMessage" @keyup.enter="sendMessage" placeholder="Escreva sua mensagem..."
               class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" />
+
+            <!-- Mic Button -->
+            <button @click="toggleRecording"
+              :class="['p-3 rounded-xl transition-colors', isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-slate-500 hover:text-primary hover:bg-primary/10']">
+              <svg v-if="!isRecording" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+              </svg>
+            </button>
+
             <button @click="sendMessage" :disabled="!currentMessage.trim()"
               class="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
               Enviar
@@ -421,7 +545,8 @@ socket.on('closed_chats_list', (chats) => {
                       ? 'bg-slate-100 text-slate-800 rounded-br-none'
                       : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'
                   ]">
-                    <p class="leading-relaxed">{{ msg.text }}</p>
+                    <p v-if="msg.type !== 'audio'" class="leading-relaxed">{{ msg.text }}</p>
+                    <audio v-else :src="msg.text" controls class="max-w-full"></audio>
                     <span class="text-[10px] block mt-1 text-right text-slate-400">
                       {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                     </span>

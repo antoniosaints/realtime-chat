@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { socket } from '../services/socket';
+import { socket, SERVER_URL } from '../services/socket';
 
 const router = useRouter();
 const step = ref('welcome'); // welcome, queue, chat
@@ -13,6 +13,9 @@ const currentMessage = ref('');
 const chatId = ref(null);
 const attendantName = ref('');
 const messagesContainer = ref(null);
+const isRecording = ref(false);
+let mediaRecorder = null;
+let audioChunks = [];
 
 const scrollToBottom = async () => {
   await nextTick();
@@ -88,10 +91,98 @@ const sendMessage = () => {
     const msg = {
       chatId: chatId.value,
       text: currentMessage.value,
-      sender: 'client'
+      sender: 'client',
+      type: 'text'
     };
     socket.emit('send_message', msg);
     currentMessage.value = '';
+  }
+};
+
+const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    let mimeType = 'audio/webm';
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      mimeType = 'audio/webm;codecs=opus';
+    } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+      mimeType = 'audio/ogg;codecs=opus';
+    }
+
+    const options = { mimeType };
+    mediaRecorder = new MediaRecorder(stream, options);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: mimeType });
+
+      if (audioBlob.size === 0) {
+        console.error("Recorded audio is empty");
+        return;
+      }
+
+      console.log("Audio recorded. Size:", audioBlob.size, "Type:", mimeType);
+
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+
+      try {
+        const baseUrl = SERVER_URL || '';
+        const response = await fetch(`${baseUrl}/api/upload-audio`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const audioUrl = `${baseUrl}${data.url}`;
+
+        const msg = {
+          chatId: chatId.value,
+          text: audioUrl,
+          sender: 'client',
+          type: 'audio'
+        };
+        socket.emit('send_message', msg);
+      } catch (err) {
+        console.error("Error uploading audio:", err);
+        alert("Erro ao enviar áudio.");
+      }
+
+      stream.getTracks().forEach(track => track.stop());
+    };
+
+    mediaRecorder.start(200);
+    isRecording.value = true;
+  } catch (err) {
+    console.error("Error accessing microphone:", err);
+    alert("Erro ao acessar microfone. Verifique as permissões.");
+  }
+};
+
+const stopRecording = () => {
+  if (mediaRecorder && isRecording.value && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.requestData();
+    mediaRecorder.stop();
+    isRecording.value = false;
+  }
+};
+
+const toggleRecording = () => {
+  if (isRecording.value) {
+    stopRecording();
+  } else {
+    startRecording();
   }
 };
 
@@ -182,7 +273,8 @@ const logout = () => {
               ? 'bg-primary text-white rounded-br-none'
               : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'
           ]">
-            <p>{{ msg.text }}</p>
+            <p v-if="msg.type !== 'audio'">{{ msg.text }}</p>
+            <audio v-else :src="msg.text" controls class="max-w-full"></audio>
             <span
               :class="['text-[10px] block mt-1', msg.sender === 'client' ? 'text-primary-light' : 'text-slate-400']">
               {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
@@ -197,6 +289,24 @@ const logout = () => {
           class="flex items-center space-x-2 bg-slate-50 rounded-full px-4 py-2 border border-slate-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all">
           <input v-model="currentMessage" @keyup.enter="sendMessage" placeholder="Type a message..."
             class="flex-1 bg-transparent border-none focus:ring-0 text-slate-900 placeholder-slate-400" />
+
+          <!-- Mic Button -->
+          <button @click="toggleRecording"
+            :class="['p-2 rounded-full transition-colors', isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:text-primary']">
+            <svg v-if="!isRecording" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+            </svg>
+          </button>
+
           <button @click="sendMessage" :disabled="!currentMessage.trim()"
             class="p-2 bg-primary text-white rounded-full hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

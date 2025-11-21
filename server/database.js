@@ -8,21 +8,27 @@ const db = new sqlite3.Database(dbPath);
 db.serialize(() => {
   // Added attendant_id to track who is chatting with whom
   db.run(`CREATE TABLE IF NOT EXISTS clients (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    socket_id TEXT,
-    status TEXT DEFAULT 'waiting',
-    attendant_id TEXT,
-    timestamp INTEGER
-  )`);
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      socket_id TEXT,
+      status TEXT DEFAULT 'waiting',
+      attendant_id TEXT,
+      timestamp INTEGER
+    )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id TEXT,
-    sender TEXT,
-    text TEXT,
-    timestamp INTEGER
-  )`);
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chat_id TEXT,
+      sender TEXT,
+      text TEXT,
+      type TEXT DEFAULT 'text',
+      timestamp INTEGER
+    )`);
+
+  // Migration: Try to add 'type' column if it doesn't exist (for existing DBs)
+  db.run("ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'", (err) => {
+    // Ignore error if column already exists
+  });
 });
 
 const dbOps = {
@@ -113,12 +119,19 @@ const dbOps = {
   addMessage: (msg) => {
     return new Promise((resolve, reject) => {
       const stmt = db.prepare(
-        "INSERT INTO messages (chat_id, sender, text, timestamp) VALUES (?, ?, ?, ?)"
+        "INSERT INTO messages (chat_id, sender, text, type, timestamp) VALUES (?, ?, ?, ?, ?)"
       );
-      stmt.run(msg.chatId, msg.sender, msg.text, msg.timestamp, function (err) {
-        if (err) reject(err);
-        else resolve(this.lastID);
-      });
+      stmt.run(
+        msg.chatId,
+        msg.sender,
+        msg.text,
+        msg.type || "text",
+        msg.timestamp,
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
       stmt.finalize();
     });
   },
