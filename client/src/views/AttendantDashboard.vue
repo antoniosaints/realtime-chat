@@ -266,6 +266,67 @@ const endChat = () => {
   }
 };
 
+const isUploadingImage = ref(false);
+const imageInput = ref(null);
+
+const triggerImageUpload = () => {
+  imageInput.value.click();
+};
+
+const handleImageUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    alert('Por favor, selecione apenas imagens.');
+    return;
+  }
+
+  isUploadingImage.value = true;
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const baseUrl = SERVER_URL || '';
+    const response = await fetch(`${baseUrl}/api/upload-image`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const imageUrl = `${baseUrl}${data.url}`;
+
+    const msg = {
+      chatId: currentChatId.value,
+      text: imageUrl,
+      sender: 'attendant',
+      type: 'image'
+    };
+    socket.emit('send_message', msg);
+
+    // Optimistic update
+    if (!messages.value[currentChatId.value]) {
+      messages.value[currentChatId.value] = [];
+    }
+    messages.value[currentChatId.value].push({
+      sender: 'attendant',
+      text: imageUrl,
+      type: 'image',
+      timestamp: Date.now()
+    });
+  } catch (err) {
+    console.error("Error uploading image:", err);
+    alert("Erro ao enviar imagem.");
+  } finally {
+    isUploadingImage.value = false;
+    event.target.value = ''; // Reset input
+  }
+};
+
 // History Logic
 const showHistory = ref(false);
 const closedChats = ref([]);
@@ -434,8 +495,10 @@ socket.on('closed_chats_list', (chats) => {
                 ? 'bg-primary text-white rounded-br-none'
                 : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'
             ]">
-              <p v-if="msg.type !== 'audio'" class="leading-relaxed">{{ msg.text }}</p>
-              <audio v-else :src="msg.text" controls class="max-w-full"></audio>
+              <p v-if="msg.type === 'text'" class="leading-relaxed">{{ msg.text }}</p>
+              <audio v-else-if="msg.type === 'audio'" :src="msg.text" controls class="max-w-full"></audio>
+              <img v-else-if="msg.type === 'image'" :src="msg.text" class="max-w-64 rounded-lg cursor-pointer"
+                @click="window.open(msg.text, '_blank')" />
               <span
                 :class="['text-[10px] block mt-1 text-right', msg.sender === 'attendant' ? 'text-primary-light' : 'text-slate-400']">
                 {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
@@ -447,6 +510,18 @@ socket.on('closed_chats_list', (chats) => {
         <!-- Input Area -->
         <div class="bg-white border-t border-slate-200 p-6">
           <div class="flex gap-4">
+
+            <!-- Image Upload -->
+            <input type="file" ref="imageInput" accept="image/*" class="hidden" @change="handleImageUpload" />
+            <button @click="triggerImageUpload" :disabled="isUploadingImage"
+              class="p-3 rounded-xl bg-slate-100 text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
+
             <input v-model="currentMessage" @keyup.enter="sendMessage" placeholder="Escreva sua mensagem..."
               class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" />
 

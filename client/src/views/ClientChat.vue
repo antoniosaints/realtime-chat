@@ -47,7 +47,7 @@ onMounted(() => {
   socket.on('chat_started', (data) => {
     console.log('Chat started:', data);
     chatId.value = data.chatId;
-    attendantName.value = data.attendant || 'Support Agent';
+    attendantName.value = data.attendant || 'Atendimento';
     queuePosition.value = null;
     step.value = 'chat';
   });
@@ -192,6 +192,56 @@ const logout = () => {
   socket.disconnect();
   router.push('/login');
 };
+
+const isUploadingImage = ref(false);
+const imageInput = ref(null);
+
+const triggerImageUpload = () => {
+  imageInput.value.click();
+};
+
+const handleImageUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    alert('Por favor, selecione apenas imagens.');
+    return;
+  }
+
+  isUploadingImage.value = true;
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const baseUrl = SERVER_URL || '';
+    const response = await fetch(`${baseUrl}/api/upload-image`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const imageUrl = `${baseUrl}${data.url}`;
+
+    const msg = {
+      chatId: chatId.value,
+      text: imageUrl,
+      sender: 'client',
+      type: 'image'
+    };
+    socket.emit('send_message', msg);
+  } catch (err) {
+    console.error("Error uploading image:", err);
+    alert("Erro ao enviar imagem.");
+  } finally {
+    isUploadingImage.value = false;
+    event.target.value = ''; // Reset input
+  }
+};
 </script>
 
 <template>
@@ -273,8 +323,10 @@ const logout = () => {
               ? 'bg-primary text-white rounded-br-none'
               : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'
           ]">
-            <p v-if="msg.type !== 'audio'">{{ msg.text }}</p>
-            <audio v-else :src="msg.text" controls class="max-w-full"></audio>
+            <p v-if="msg.type === 'text'">{{ msg.text }}</p>
+            <audio v-else-if="msg.type === 'audio'" :src="msg.text" controls class="max-w-full"></audio>
+            <img v-else-if="msg.type === 'image'" :src="msg.text" class="max-w-64 rounded-lg cursor-pointer"
+              @click="window.open(msg.text, '_blank')" />
             <span
               :class="['text-[10px] block mt-1', msg.sender === 'client' ? 'text-primary-light' : 'text-slate-400']">
               {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
@@ -287,6 +339,18 @@ const logout = () => {
       <div class="bg-white border-t border-slate-100 p-4">
         <div
           class="flex items-center space-x-2 bg-slate-50 rounded-full px-4 py-2 border border-slate-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+
+          <!-- Image Upload -->
+          <input type="file" ref="imageInput" accept="image/*" class="hidden" @change="handleImageUpload" />
+          <button @click="triggerImageUpload" :disabled="isUploadingImage"
+            class="text-slate-400 hover:text-primary transition-colors disabled:opacity-50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </button>
+
           <input v-model="currentMessage" @keyup.enter="sendMessage" placeholder="Type a message..."
             class="flex-1 bg-transparent border-none focus:ring-0 text-slate-900 placeholder-slate-400" />
 

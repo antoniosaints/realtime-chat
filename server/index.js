@@ -29,37 +29,57 @@ if (!fs.existsSync(audioDir)) {
   fs.mkdirSync(audioDir);
 }
 
-// Configure Multer
-const storage = multer.diskStorage({
+// Ensure images directory exists
+const imageDir = path.join(__dirname, "images");
+if (!fs.existsSync(imageDir)) {
+  fs.mkdirSync(imageDir);
+}
+
+// Configure Multer for Audio
+const audioStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, audioDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    // We assume the blob is webm/opus, but we can try to infer or just use .webm
     cb(null, uniqueSuffix + ".webm");
   },
 });
 
-const upload = multer({ storage: storage });
+// Configure Multer for Images
+const imageStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, imageDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname) || ".jpg";
+    cb(null, uniqueSuffix + ext);
+  },
+});
+
+const uploadAudio = multer({ storage: audioStorage });
+const uploadImage = multer({ storage: imageStorage });
 
 // Serve static files
 app.use("/audios", express.static(audioDir));
+app.use("/images", express.static(imageDir));
 
-// Upload endpoint
-app.post("/api/upload-audio", upload.single("audio"), (req, res) => {
+// Upload Audio Endpoint
+app.post("/api/upload-audio", uploadAudio.single("audio"), (req, res) => {
   if (!req.file) {
     return res.status(400).send("No file uploaded.");
   }
-  // Return the URL to access the file
-  // Assuming server runs on same host/port, relative path works for frontend if proxied or same origin
-  // But here frontend is 5173, backend 3000. We need full URL or proxy.
-  // For now, let's return relative path and frontend handles base URL or we return full URL.
-  // Since we are using cors *, we probably need full URL or frontend needs to know backend URL.
-  // Let's return relative path and assume frontend knows backend URL (socket.js has it).
-  // Actually, better to return full URL if possible, or just path.
-  // Let's stick to path `/audios/filename` and frontend prepends backend URL.
   const fileUrl = `/audios/${req.file.filename}`;
+  res.json({ url: fileUrl });
+});
+
+// Upload Image Endpoint
+app.post("/api/upload-image", uploadImage.single("image"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).send("No file uploaded.");
+  }
+  const fileUrl = `/images/${req.file.filename}`;
   res.json({ url: fileUrl });
 });
 
