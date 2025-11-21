@@ -30,6 +30,9 @@ watch(currentMessages, scrollToBottom, { deep: true });
 watch(currentChatId, scrollToBottom);
 
 onMounted(() => {
+  if (!socket.connected) {
+    socket.connect();
+  }
   socket.emit('attendant_join');
 
   socket.on('queue_update', (updatedQueue) => {

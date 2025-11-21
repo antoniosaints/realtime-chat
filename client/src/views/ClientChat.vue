@@ -1,8 +1,11 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { socket } from '../services/socket';
 
-const name = ref('');
+const router = useRouter();
+const step = ref('welcome'); // welcome, queue, chat
+const clientName = ref(localStorage.getItem('username') || '');
 const joined = ref(false);
 const queuePosition = ref(null);
 const messages = ref([]);
@@ -24,6 +27,7 @@ onMounted(() => {
   socket.on('joined_queue', (data) => {
     console.log('Joined queue:', data);
     joined.value = true;
+    step.value = 'queue';
     queuePosition.value = data.position;
   });
 
@@ -42,6 +46,7 @@ onMounted(() => {
     chatId.value = data.chatId;
     attendantName.value = data.attendant || 'Support Agent';
     queuePosition.value = null;
+    step.value = 'chat';
   });
 
   socket.on('receive_message', (msg) => {
@@ -63,8 +68,18 @@ onUnmounted(() => {
 });
 
 const joinQueue = () => {
-  if (name.value.trim()) {
-    socket.emit('join_queue', name.value);
+  console.log('Attempting to join queue. Name:', clientName.value);
+  if (clientName.value.trim()) {
+    console.log('Connecting socket...');
+    socket.connect();
+    console.log('Emitting join_queue...');
+    socket.emit('join_queue', clientName.value);
+    step.value = 'queue';
+    console.log('Step set to queue');
+  } else {
+    console.warn('Client name is empty!');
+    alert('Erro: Nome do cliente não encontrado. Por favor, faça login novamente.');
+    router.push('/login');
   }
 };
 
@@ -79,35 +94,45 @@ const sendMessage = () => {
     currentMessage.value = '';
   }
 };
+
+const logout = () => {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('username');
+  socket.disconnect();
+  router.push('/login');
+};
 </script>
 
 <template>
   <div class="min-h-screen bg-slate-50 flex flex-col">
-    <!-- Login Screen -->
-    <div v-if="!joined && !chatId" class="flex-1 flex items-center justify-center p-6">
-      <div class="bg-white w-full max-w-md rounded-2xl shadow-xl p-8 space-y-6">
-        <div class="text-center space-y-2">
-          <h1 class="text-3xl font-bold text-slate-900">Bem vindo</h1>
-          <p class="text-slate-500">Por favor, digite seu nome para iniciar a conversa com o suporte.</p>
-        </div>
+    <!-- Welcome Screen -->
+    <div v-if="step === 'welcome'" class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+      <div class="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-8 animate-pulse">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-primary" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      </div>
+      <h1 class="text-3xl font-bold text-slate-800 mb-2">Olá, {{ clientName }}</h1>
+      <p class="text-slate-500 mb-8 max-w-xs mx-auto">Estamos prontos para te atender. Clique abaixo para entrar na
+        fila.</p>
 
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Nome</label>
-            <input v-model="name" type="text"
-              class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-              placeholder="John Doe" @keyup.enter="joinQueue" />
-          </div>
-          <button @click="joinQueue"
-            class="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition-colors shadow-lg shadow-primary/30">
-            Iniciar Chat
-          </button>
-        </div>
+      <div class="w-full max-w-xs space-y-4">
+        <button @click="joinQueue"
+          class="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-2xl shadow-xl shadow-primary/20 transition-all transform hover:scale-[1.02] active:scale-[0.98]">
+          Iniciar Atendimento
+        </button>
+
+        <button @click="logout"
+          class="w-full bg-white border border-slate-200 text-slate-600 font-medium py-3 rounded-2xl hover:bg-slate-50 transition-colors">
+          Sair
+        </button>
       </div>
     </div>
 
     <!-- Queue Screen -->
-    <div v-else-if="joined && !chatId"
+    <div v-else-if="step === 'queue'"
       class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-8">
       <div class="relative">
         <div class="absolute inset-0 bg-primary/20 rounded-full animate-ping"></div>
@@ -132,7 +157,7 @@ const sendMessage = () => {
     </div>
 
     <!-- Chat Screen -->
-    <div v-else class="flex-1 flex flex-col h-screen">
+    <div v-else-if="step === 'chat'" class="flex-1 flex flex-col h-screen">
       <!-- Header -->
       <header class="bg-white border-b border-slate-100 px-4 py-3 flex items-center space-x-4 shadow-sm z-10">
         <div class="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold">
