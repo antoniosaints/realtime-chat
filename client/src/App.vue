@@ -1,13 +1,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import io from 'socket.io-client'
+import { SERVER_URL } from '../services/socket';
 
 const socket = ref(null)
 const connected = ref(false)
 
 onMounted(() => {
   // Connect to the server
-  socket.value = io('http://localhost:3000')
+  socket.value = io(SERVER_URL)
 
   socket.value.on('connect', () => {
     connected.value = true
