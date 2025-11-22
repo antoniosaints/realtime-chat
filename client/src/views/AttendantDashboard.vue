@@ -504,8 +504,8 @@ socket.on('closed_chats_list', (chats) => {
     </aside>
 
     <!-- Main Chat Area -->
-    <main class="flex-1 flex flex-col bg-slate-50/50">
-      <div v-if="currentChat" class="flex-1 flex flex-col h-full">
+    <main class="flex-1 flex flex-col bg-slate-50/50 w-full">
+      <div v-if="currentChat" class="flex-1 flex flex-col h-full w-[calc(100vw-17rem)]">
         <!-- Chat Header -->
         <header class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
           <div class="flex items-center gap-4">
@@ -637,7 +637,7 @@ socket.on('closed_chats_list', (chats) => {
     <!-- History Modal -->
     <div v-if="showHistory"
       class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex overflow-hidden flex-col">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[80vh] flex overflow-hidden flex-col">
         <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
           <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24"
@@ -658,7 +658,7 @@ socket.on('closed_chats_list', (chats) => {
 
         <div class="flex-1 flex overflow-hidden">
           <!-- List -->
-          <div class="w-1/3 border-r border-slate-200 overflow-y-auto bg-slate-50">
+          <div class="w-80 border-r border-slate-200 overflow-y-auto bg-slate-50">
             <div v-if="closedChats.length === 0" class="p-8 text-center text-slate-400">
               Nenhum histórico encontrado.
             </div>
@@ -675,7 +675,7 @@ socket.on('closed_chats_list', (chats) => {
           </div>
 
           <!-- Details -->
-          <div class="flex-1 flex flex-col bg-white">
+          <div class="flex-1 flex flex-col bg-white max-w-[calc(100vw-70rem)]">
             <div v-if="selectedHistoryChat" class="flex-1 flex flex-col h-full">
               <div class="p-4 border-b border-slate-100 bg-slate-50/30">
                 <h3 class="font-bold text-slate-800">{{ selectedHistoryChat.name }}</h3>
@@ -685,7 +685,7 @@ socket.on('closed_chats_list', (chats) => {
                 <div v-for="(msg, index) in historyMessages" :key="index"
                   :class="['flex', msg.sender === 'attendant' ? 'justify-end' : 'justify-start']">
                   <div :class="[
-                    'max-w-[70%] px-5 py-3 rounded-2xl shadow-sm',
+                    'max-w-[80%] px-5 py-3 rounded-2xl shadow-sm',
                     msg.sender === 'attendant'
                       ? 'bg-slate-100 text-slate-800 rounded-br-none'
                       : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'
@@ -693,7 +693,7 @@ socket.on('closed_chats_list', (chats) => {
                     <audio v-if="msg.type === 'audio'" :src="msg.text" controls class="max-w-full"></audio>
                     <img v-else-if="msg.type === 'image'" :src="msg.text" class="max-w-64 rounded-lg cursor-pointer"
                       @click="window.open(msg.text, '_blank')" />
-                    <p v-else class="leading-relaxed">{{ msg.text }}</p>
+                    <p v-else class="leading-relaxed break-words whitespace-pre-wrap">{{ msg.text }}</p>
                     <span class="text-[10px] block mt-1 text-right text-slate-400">
                       {{ new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                     </span>

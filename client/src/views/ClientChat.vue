@@ -417,7 +417,7 @@ const handleImageUpload = async (event) => {
             </svg>
           </button>
 
-          <textarea v-model="currentMessage" @keyup.enter="handleEnterKey" placeholder="Type a message..."
+          <textarea v-model="currentMessage" @keyup.enter="handleEnterKey" placeholder="Escreva sua mensagem..."
             class="flex-1 bg-transparent border-none outline-none text-slate-900 placeholder-slate-400 resize-none max-h-32 overflow-y-auto"
             rows="1" @input="autoResize"></textarea>
 

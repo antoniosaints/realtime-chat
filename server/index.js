@@ -145,7 +145,7 @@ io.on("connection", (socket) => {
       io.to(clientId).emit("chat_started", {
         attendantId: socket.id,
         chatId: clientId,
-        attendant: "Support Agent",
+        attendant: "Agente",
       });
 
       // Notify the attendant

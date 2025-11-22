@@ -9,7 +9,7 @@ export const state = reactive({
 export const SERVER_URL =
   import.meta.env.MODE === "production"
     ? undefined
-    : "http://192.168.6.83:3000";
+    : "http://localhost:3000";
 
 export const socket = io(SERVER_URL, {
   autoConnect: false,
