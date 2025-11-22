@@ -1,14 +1,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import io from 'socket.io-client'
-import { SERVER_URL } from 'services/socket';
 
 const socket = ref(null)
 const connected = ref(false)
+const URL = import.meta.env.mome === "production" ? "https://cas-api.ngoezu.easypanel.host" : "http://localhost:3000"
 
 onMounted(() => {
   // Connect to the server
-  socket.value = io(SERVER_URL)
+  socket.value = io(URL)
 
   socket.value.on('connect', () => {
     connected.value = true
