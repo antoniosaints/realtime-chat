@@ -6,10 +6,7 @@ export const state = reactive({
 });
 
 // "undefined" means the URL will be computed from the `window.location` object
-export const SERVER_URL =
-  import.meta.env.MODE === "production"
-    ? undefined
-    : "http://localhost:3000";
+export const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
 
 export const socket = io(SERVER_URL, {
   autoConnect: false,
