@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import io from 'socket.io-client'
-import { SERVER_URL } from '../services/socket';
+import { SERVER_URL } from 'services/socket';
 
 const socket = ref(null)
 const connected = ref(false)
