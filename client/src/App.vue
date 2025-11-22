@@ -4,7 +4,7 @@ import io from 'socket.io-client'
 
 const socket = ref(null)
 const connected = ref(false)
-const URL = import.meta.env.mome === "production" ? "https://cas-api.ngoezu.easypanel.host" : "http://localhost:3000"
+const URL = "https://cas-api.ngoezu.easypanel.host"
 
 onMounted(() => {
   // Connect to the server

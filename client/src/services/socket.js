@@ -6,7 +6,7 @@ export const state = reactive({
 });
 
 // "undefined" means the URL will be computed from the `window.location` object
-export const SERVER_URL = import.meta.env.mome === "production" ? "https://cas-api.ngoezu.easypanel.host" : "http://localhost:3000";
+export const SERVER_URL = "https://cas-api.ngoezu.easypanel.host";
 
 export const socket = io(SERVER_URL, {
   autoConnect: false,
